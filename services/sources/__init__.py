@@ -9,6 +9,7 @@ from .lagou import LagouSource
 from .lagou_browser import LagouBrowserSource, LagouHybridSource
 from .boss import BossSource
 from .zhaopin import ZhaopinSource
+from .bytedance import BytedanceSource
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ SOURCE_REGISTRY = {
     LagouHybridSource.source_id: LagouHybridSource,
     BossSource.source_id: BossSource,
     ZhaopinSource.source_id: ZhaopinSource,
+    BytedanceSource.source_id: BytedanceSource,
 }
 
 # 缓存已创建的实例
