@@ -476,6 +476,11 @@ textarea {
   color: var(--text-muted);
 }
 
+.status-unknown {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 /* Notice banners */
 .notice-banner {
   margin-bottom: 1.5rem;

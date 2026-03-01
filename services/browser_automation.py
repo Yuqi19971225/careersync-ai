@@ -201,13 +201,16 @@ class BrowserAutomationManager:
                 self.is_initialized = False
 
 
-# 全局浏览器管理器实例
-browser_manager = BrowserAutomationManager(headless=True)
+# 全局浏览器管理器实例（延迟初始化）
+_browser_manager_instance = None
 
 
-def get_browser_manager() -> BrowserAutomationManager:
-    """获取浏览器管理器实例"""
-    return browser_manager
+def get_browser_manager(headless: bool = True) -> BrowserAutomationManager:
+    """获取浏览器管理器实例（延迟创建）"""
+    global _browser_manager_instance
+    if _browser_manager_instance is None:
+        _browser_manager_instance = BrowserAutomationManager(headless=headless)
+    return _browser_manager_instance
 
 
 def get_page_with_browser(url: str, wait_for_element: Optional[str] = None) -> Optional[str]:

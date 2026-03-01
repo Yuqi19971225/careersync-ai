@@ -36,6 +36,16 @@
     initNoticeClose();
     initCaptchaModal();
     startCaptchaPolling();
+    
+    // 初始化招聘网站选择框（不需要等待搜索点击）
+    initializeSourceCheckboxes().then(function(sources) {
+      sourcesInitialized = true;
+      pendingSources = sources;
+    }).catch(function(error) {
+      console.error('Failed to initialize source checkboxes:', error);
+      // 即使失败也要显示基本的选项
+      showDefaultSources();
+    });
   });
 
   function request(method, path, body) {
@@ -70,25 +80,82 @@
     });
   });
 
-  // System info and source initialization
-  Promise.all([
-    get('/api/system_info'),
-    get('/api/job_sources')
-  ]).then(function (results) {
-    var info = results[0];
-    var sources = results[1];
+  // System info and source initialization - delayed until needed
+  function initializeSystem() {
+    return Promise.all([
+      get('/api/system_info'),
+      get('/api/job_sources')
+    ]).then(function (results) {
+      var info = results[0];
+      var sources = results[1];
+      
+      // Update system info
+      var el = document.getElementById('system-version');
+      if (el) el.textContent = 'v' + (info.version || '');
+      var qwen = document.getElementById('qwen-status');
+      if (qwen) qwen.classList.toggle('on', !!info.qwen_enabled);
+      
+      return sources;
+    });
+  }
+  
+  // Initialize source checkboxes separately
+  function initializeSourceCheckboxes() {
+    return get('/api/job_sources').then(function(sourcesData) {
+      initSourceCheckboxes(sourcesData);
+      return sourcesData;
+    });
+  }
+  
+  // Flag to track if system is initialized
+  let systemInitialized = false;
+  let sourcesInitialized = false;
+  let pendingSources = null;
+  
+  // Show default sources when API fails
+  function showDefaultSources() {
+    var container = document.getElementById('source-checkboxes');
+    if (!container) return;
     
-    // Update system info
-    var el = document.getElementById('system-version');
-    if (el) el.textContent = 'v' + (info.version || '');
-    var qwen = document.getElementById('qwen-status');
-    if (qwen) qwen.classList.toggle('on', !!info.qwen_enabled);
+    var defaultSources = [
+      {id: 'lagou', name: '拉勾网'},
+      {id: 'boss', name: 'BOSS直聘'},
+      {id: 'zhaopin', name: '智联招聘'}
+    ];
     
-    // Initialize source checkboxes
-    initSourceCheckboxes(sources);
-  }).catch(function (error) {
-    console.error('Failed to initialize:', error);
-  });
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Create checkbox for each default source
+    defaultSources.forEach(function(source) {
+      var checkboxDiv = document.createElement('div');
+      checkboxDiv.className = 'source-checkbox';
+      checkboxDiv.innerHTML = `
+        <input type="checkbox" id="source-${source.id}" value="${source.id}">
+        <span>${source.name}</span>
+        <span class="source-status status-unknown" id="status-${source.id}">
+          ?
+        </span>
+      `;
+      
+      // Add click handler
+      checkboxDiv.addEventListener('click', function(e) {
+        if (e.target.type !== 'checkbox') {
+          var checkbox = checkboxDiv.querySelector('input[type="checkbox"]');
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+      
+      // Add change handler
+      var checkbox = checkboxDiv.querySelector('input[type="checkbox"]');
+      checkbox.addEventListener('change', function() {
+        checkboxDiv.classList.toggle('checked', this.checked);
+      });
+      
+      container.appendChild(checkboxDiv);
+    });
+  }
   
   // Initialize source checkboxes
   function initSourceCheckboxes(sourcesData) {
@@ -101,10 +168,27 @@
     // Clear existing content
     container.innerHTML = '';
     
-    // Create checkbox for each source
+    // Filter and merge lagou related sources
+    var filteredSources = [];
+    var hasLagou = false;
+    
     availableSources.forEach(function(sourceId) {
+      if (sourceId.startsWith('lagou')) {
+        if (!hasLagou) {
+          filteredSources.push('lagou'); // Only add one lagou option
+          hasLagou = true;
+        }
+      } else {
+        filteredSources.push(sourceId);
+      }
+    });
+    
+    // Create checkbox for each filtered source
+    filteredSources.forEach(function(sourceId) {
       var sourceName = getSourceDisplayName(sourceId);
-      var isChecked = enabledSources.includes(sourceId);
+      // If any lagou source was originally checked, the merged option should be checked
+      var isChecked = enabledSources.some(s => s.startsWith('lagou')) && sourceId === 'lagou' || 
+                     enabledSources.includes(sourceId);
       
       var checkboxDiv = document.createElement('div');
       checkboxDiv.className = 'source-checkbox ' + (isChecked ? 'checked' : '');
@@ -143,26 +227,23 @@
   function getSourceDisplayName(sourceId) {
     var names = {
       'lagou': '拉勾网',
+      'lagou_browser': '拉勾网',
+      'lagou_hybrid': '拉勾网',
       'boss': 'BOSS直聘',
       'zhaopin': '智联招聘'
     };
     return names[sourceId] || sourceId;
   }
   
-  // Check source status
+  // Check source status - simplified to avoid automatic API calls
   function checkSourceStatus(sourceId) {
     var statusElement = document.getElementById('status-' + sourceId);
     if (!statusElement) return;
     
-    // Set to pending state
-    statusElement.className = 'source-status status-pending';
-    statusElement.innerHTML = '<span class="loading-spinner"></span>';
-    
-    // Simulate status check (in real implementation, this would call an API)
-    setTimeout(function() {
-      var isAvailable = getSourceAvailability(sourceId);
-      updateSourceStatus(sourceId, isAvailable);
-    }, 800);
+    // Set to unknown state initially (no automatic checks)
+    statusElement.className = 'source-status status-unknown';
+    statusElement.innerHTML = '?';
+    statusElement.title = '状态未知 - 点击搜索时检查';
   }
   
   // Get source availability (mock implementation)
@@ -191,7 +272,19 @@
   // Get selected sources
   function getSelectedSources() {
     var checkboxes = document.querySelectorAll('#source-checkboxes input[type="checkbox"]:checked');
-    return Array.from(checkboxes).map(cb => cb.value);
+    var selectedSources = Array.from(checkboxes).map(cb => cb.value);
+    
+    // 如果选择了任何拉勾网相关的源，统一使用lagou_hybrid（最优模式）
+    var lagouSources = ['lagou', 'lagou_browser', 'lagou_hybrid'];
+    var hasLagou = selectedSources.some(source => lagouSources.includes(source));
+    
+    if (hasLagou) {
+      // 移除所有拉勾网相关源，只保留最优的lagou_hybrid
+      selectedSources = selectedSources.filter(source => !lagouSources.includes(source));
+      selectedSources.push('lagou_hybrid');
+    }
+    
+    return selectedSources;
   }
 
   // Search jobs
@@ -206,80 +299,103 @@
         searchResult.textContent = '请输入职位关键词';
         return;
       }
-      searchResult.className = 'result-box loading';
-      searchResult.textContent = '正在搜索…';
-      btnSearch.disabled = true;
-      var selectedSources = getSelectedSources();
-      if (selectedSources.length === 0) {
-        searchResult.className = 'result-box error';
-        searchResult.innerHTML = `
-          <div class="notice-banner notice-error">
-            <div class="notice-content">
-              <span class="notice-icon">⚠️</span>
-              <div class="notice-text">
-                <strong>请选择至少一个招聘网站</strong>
-                <br>请在上方选择要搜索的招聘网站
-              </div>
-            </div>
-          </div>
-        `;
-        btnSearch.disabled = false;
-        return;
-      }
       
-      post('/api/search_jobs', { 
-        keyword: keyword, 
-        city: city, 
-        page: 1,
-        sources: selectedSources
-      })
-        .then(function (data) {
-          btnSearch.disabled = false;
-          if (!data.jobs || data.jobs.length === 0) {
-            searchResult.className = 'result-box warning';
-            searchResult.innerHTML = `
-              <div class="source-unavailable-notice">
-                <strong>未找到职位数据</strong>
-                <br>可能是由于以下原因：
-                <ul>
-                  ${selectedSources.map(source => `<li>${getSourceDisplayName(source)}: 暂无相关职位或源不可用</li>`).join('')}
-                </ul>
-                <br>建议：<br>
-                • 尝试更换关键词<br>
-                • 选择其他招聘网站<br>
-                • 稍后再试
-              </div>
-            `;
-            return;
-          }
-          searchResult.className = 'result-box';
-          searchResult.innerHTML = '<ul class="job-list">' + data.jobs.map(function (job) {
-            return (
-              '<li class="job-card">' +
-              '<h3>' + escapeHtml(job.title || '') + '</h3>' +
-              '<div class="job-meta">' + escapeHtml(job.company || '') +
-              ' <span class="salary">' + escapeHtml(job.salary || '') + '</span></div>' +
-              (job.description ? '<div class="job-desc">' + escapeHtml(job.description).slice(0, 150) + '…</div>' : '') +
-              '</li>'
-            );
-          }).join('') + '</ul>';
-        })
-        .catch(function (err) {
-          btnSearch.disabled = false;
+      // Initialize system on first search if not already done
+      var initPromise = systemInitialized ? Promise.resolve(pendingSources) : initializeSystem().then(function(sources) {
+        systemInitialized = true;
+        pendingSources = sources;
+        return sources;
+      });
+      
+      // Ensure sources are initialized
+      var sourcesPromise = sourcesInitialized ? Promise.resolve(pendingSources) : initializeSourceCheckboxes().then(function(sources) {
+        sourcesInitialized = true;
+        pendingSources = sources;
+        return sources;
+      });
+      
+      // Wait for both initializations to complete
+      Promise.all([initPromise, sourcesPromise]).then(function(results) {
+        var sources = results[1]; // Use sources from the second promise
+        searchResult.className = 'result-box loading';
+        searchResult.textContent = '正在搜索…';
+        btnSearch.disabled = true;
+        var selectedSources = getSelectedSources();
+        if (selectedSources.length === 0) {
           searchResult.className = 'result-box error';
           searchResult.innerHTML = `
             <div class="notice-banner notice-error">
               <div class="notice-content">
-                <span class="notice-icon">❌</span>
+                <span class="notice-icon">⚠️</span>
                 <div class="notice-text">
-                  <strong>搜索遇到问题</strong>
-                  <br>${escapeHtml(err.message || '搜索失败')}<br><br>
-                  <small>如果您持续遇到此问题，请联系技术支持。</small>
+                  <strong>请选择至少一个招聘网站</strong>
+                  <br>请在上方选择要搜索的招聘网站
                 </div>
               </div>
             </div>
           `;
-        });
+          btnSearch.disabled = false;
+          return;
+        }
+        
+        post('/api/search_jobs', { 
+          keyword: keyword, 
+          city: city, 
+          page: 1,
+          sources: selectedSources
+        })
+          .then(function (data) {
+            btnSearch.disabled = false;
+            if (!data.jobs || data.jobs.length === 0) {
+              searchResult.className = 'result-box warning';
+              searchResult.innerHTML = `
+                <div class="source-unavailable-notice">
+                  <strong>未找到职位数据</strong>
+                  <br>可能是由于以下原因：
+                  <ul>
+                    ${selectedSources.map(source => `<li>${getSourceDisplayName(source)}: 暂无相关职位或源不可用</li>`).join('')}
+                  </ul>
+                  <br>建议：<br>
+                  • 尝试更换关键词<br>
+                  • 选择其他招聘网站<br>
+                  • 稍后再试
+                </div>
+              `;
+              return;
+            }
+            searchResult.className = 'result-box';
+            searchResult.innerHTML = '<ul class="job-list">' + data.jobs.map(function (job) {
+              return (
+                '<li class="job-card">' +
+                '<h3>' + escapeHtml(job.title || '') + '</h3>' +
+                '<div class="job-meta">' + escapeHtml(job.company || '') +
+                ' <span class="salary">' + escapeHtml(job.salary || '') + '</span></div>' +
+                (job.description ? '<div class="job-desc">' + escapeHtml(job.description).slice(0, 150) + '…</div>' : '') +
+                '</li>'
+              );
+            }).join('') + '</ul>';
+          })
+          .catch(function (err) {
+            btnSearch.disabled = false;
+            searchResult.className = 'result-box error';
+            searchResult.innerHTML = `
+              <div class="notice-banner notice-error">
+                <div class="notice-content">
+                  <span class="notice-icon">❌</span>
+                  <div class="notice-text">
+                    <strong>搜索遇到问题</strong>
+                    <br>${escapeHtml(err.message || '搜索失败')}<br><br>
+                    <small>如果您持续遇到此问题，请联系技术支持。</small>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+      }).catch(function(error) {
+        btnSearch.disabled = false;
+        searchResult.className = 'result-box error';
+        searchResult.textContent = '系统初始化失败: ' + (error.message || '未知错误');
+      });
     });
   }
 

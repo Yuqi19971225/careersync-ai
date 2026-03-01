@@ -126,16 +126,42 @@ def register_routes(app, career_sync_ai):
 
     @app.route('/api/job_sources', methods=['GET'])
     def job_sources():
-        """返回已注册的招聘源 id 列表及当前启用的源"""
+        """返回已注册的招聘源 id 列表及当前启用的源（合并拉勾网相关源）"""
         from services.sources import list_source_ids, get_source_status
         available_sources = list_source_ids()
         
+        # 过滤并合并拉勾网相关源
+        filtered_sources = []
+        has_lagou = False
+        
+        for source_id in available_sources:
+            if source_id.startswith('lagou'):
+                if not has_lagou:
+                    filtered_sources.append('lagou')  # 只保留一个拉勾网选项
+                    has_lagou = True
+            else:
+                filtered_sources.append(source_id)
+        
         # 获取每个源的状态信息
         source_statuses = {}
-        for source_id in available_sources:
+        for source_id in filtered_sources:
             try:
-                status_info = get_source_status(source_id)
-                source_statuses[source_id] = status_info
+                # 对于合并后的拉勾网源，获取最佳状态
+                if source_id == 'lagou':
+                    # 检查所有拉勾网相关源的状态，返回最优的那个
+                    lagou_source_ids = [sid for sid in available_sources if sid.startswith('lagou')]
+                    best_status = None
+                    for lagou_sid in lagou_source_ids:
+                        status_info = get_source_status(lagou_sid)
+                        if status_info.get('available', False):
+                            best_status = status_info
+                            break
+                    if not best_status:
+                        best_status = get_source_status(lagou_source_ids[0]) if lagou_source_ids else {'available': False, 'message': '未知状态'}
+                    source_statuses[source_id] = best_status
+                else:
+                    status_info = get_source_status(source_id)
+                    source_statuses[source_id] = status_info
             except Exception as e:
                 logger.warning("获取源 %s 状态失败: %s", source_id, e)
                 source_statuses[source_id] = {
@@ -144,7 +170,7 @@ def register_routes(app, career_sync_ai):
                 }
         
         return jsonify({
-            'available': available_sources,
+            'available': filtered_sources,
             'enabled': career_sync_ai.system_info.get('job_sources'),
             'statuses': source_statuses
         })

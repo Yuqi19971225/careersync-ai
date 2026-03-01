@@ -21,9 +21,17 @@ class LagouBrowserSource(BaseJobSource):
     
     def __init__(self, timeout: int = 30, max_per_page: int = 20, headless: bool = True):
         super().__init__(timeout, max_per_page)
-        self.browser_manager = get_browser_manager()
         self.headless = headless
+        # 延迟初始化浏览器管理器，只在实际需要时创建
+        self._browser_manager = None
         logger.info("[拉勾网-浏览器] 初始化完成")
+    
+    @property
+    def browser_manager(self):
+        """延迟获取浏览器管理器实例"""
+        if self._browser_manager is None:
+            self._browser_manager = get_browser_manager(headless=self.headless)
+        return self._browser_manager
     
     def search(self, keyword: str, city: str = '全国', page: int = 1) -> List[Dict[str, Any]]:
         """使用浏览器自动化搜索职位"""
@@ -177,6 +185,8 @@ class LagouHybridSource(LagouBrowserSource):
         # 导入普通的拉勾网源用于降级
         from .lagou import LagouSource
         self.fallback_source = LagouSource(*args, **kwargs)
+        # 延迟初始化浏览器管理器
+        self._browser_manager = None
     
     def search(self, keyword: str, city: str = '全国', page: int = 1) -> List[Dict[str, Any]]:
         """混合搜索：先尝试浏览器，失败则使用普通方式"""

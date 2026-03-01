@@ -5,7 +5,7 @@ import logging
 import base64
 import io
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from abc import ABC, abstractmethod
 
 from selenium.webdriver.common.by import By
@@ -13,6 +13,24 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 logger = logging.getLogger(__name__)
+
+# AI支持检测
+try:
+    from .ai_captcha_handler import EnhancedSlideCaptchaHandler
+    AI_SUPPORT_AVAILABLE = True
+    logger.info("✅ AI验证码支持可用")
+except ImportError as e:
+    AI_SUPPORT_AVAILABLE = False
+    logger.info(f"ℹ️ AI验证码支持不可用: {e}")
+
+# 千问大模型支持检测
+try:
+    from .qwen_captcha_handler import get_qwen_captcha_processor, enhance_captcha_with_qwen
+    QWEN_SUPPORT_AVAILABLE = True
+    logger.info("✅ 千问验证码支持可用")
+except ImportError as e:
+    QWEN_SUPPORT_AVAILABLE = False
+    logger.info(f"ℹ️ 千问验证码支持不可用: {e}")
 
 
 class CaptchaSolver(ABC):
@@ -36,28 +54,46 @@ class ManualCaptchaSolver(CaptchaSolver):
         self.pending_captchas = {}  # 存储待处理的验证码任务
     
     def solve_captcha(self, driver: WebDriver, captcha_element) -> bool:
-        """人工解决验证码 - 返回False表示需要人工干预"""
+        """解决验证码 - 先尝试千问AI，再尝试传统AI，最后人工处理"""
         captcha_id = f"captcha_{int(time.time() * 1000)}"
         
-        # 获取验证码图片
+        # 获取验证码图片和类型
         try:
             captcha_image = self._extract_captcha_image(captcha_element)
             captcha_type = self._detect_captcha_type(captcha_element)
             
-            # 存储验证码任务
-            self.pending_captchas[captcha_id] = {
-                'driver': driver,
-                'element': captcha_element,
-                'image': captcha_image,
-                'type': captcha_type,
-                'timestamp': time.time()
-            }
+            if not captcha_image:
+                logger.warning("无法提取验证码图片")
+                return False
+                
+            logger.info(f"🔄 开始处理 {captcha_type} 类型验证码 (ID: {captcha_id})")
             
-            logger.info("👤 验证码需要人工处理，ID: %s", captcha_id)
-            return False  # 需要人工干预
+            # 1. 首先尝试千问大模型处理
+            if QWEN_SUPPORT_AVAILABLE:
+                logger.info("🤖 尝试使用千问大模型处理验证码...")
+                qwen_result = self._try_qwen_processing(captcha_type, captcha_image, driver, captcha_element)
+                if qwen_result:
+                    logger.info("✅ 千问大模型处理成功")
+                    return True
+                else:
+                    logger.info("❌ 千问大模型处理失败，尝试其他方法")
+            
+            # 2. 尝试传统AI处理（仅限滑动验证码）
+            if AI_SUPPORT_AVAILABLE and captcha_type == 'slide':
+                logger.info("🧠 尝试使用传统AI处理滑动验证码...")
+                ai_result = self._try_ai_processing(driver, captcha_element, captcha_image)
+                if ai_result:
+                    logger.info("✅ 传统AI处理成功")
+                    return True
+                else:
+                    logger.info("❌ 传统AI处理失败，转人工处理")
+            
+            # 3. 最后转人工处理
+            logger.info("👤 转入人工处理流程")
+            return self._handle_manual_processing(driver, captcha_element, captcha_image, captcha_type, captcha_id)
             
         except Exception as e:
-            logger.error("人工验证码处理失败: %s", e)
+            logger.error(f"验证码处理流程出错: {e}")
             return False
     
     def _extract_captcha_image(self, captcha_element) -> Optional[str]:
@@ -80,6 +116,96 @@ class ManualCaptchaSolver(CaptchaSolver):
         except Exception as e:
             logger.warning("提取验证码图片失败: %s", e)
             return None
+    
+    def _try_qwen_processing(self, captcha_type: str, image_data: str, 
+                           driver: WebDriver, element) -> bool:
+        """尝试使用千问大模型处理验证码"""
+        try:
+            # 使用千问处理器
+            result = enhance_captcha_with_qwen(captcha_type, image_data)
+            
+            if result is None:
+                return False
+            
+            # 根据不同类型应用结果
+            if captcha_type == 'slide' and isinstance(result, int):
+                # 滑动验证码：执行滑动操作
+                return self._execute_slide_action(driver, element, result)
+            elif captcha_type == 'image_text' and isinstance(result, str):
+                # 图片文字验证码：输入识别结果
+                return self._solve_image_text_captcha(driver, element, result)
+            elif captcha_type == 'click' and isinstance(result, list):
+                # 点选验证码：执行点击操作
+                return self._solve_click_captcha(driver, element, ';'.join([f"{x},{y}" for x, y in result]))
+            else:
+                logger.warning(f"千问处理结果类型不匹配: {type(result)}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"千问验证码处理失败: {e}")
+            return False
+    
+    def _try_ai_processing(self, driver: WebDriver, element, image_data: str) -> bool:
+        """尝试使用传统AI处理滑动验证码"""
+        try:
+            # 这里可以集成原有的AI处理逻辑
+            # 暂时返回False，让人工处理
+            return False
+        except Exception as e:
+            logger.error(f"传统AI处理失败: {e}")
+            return False
+    
+    def _handle_manual_processing(self, driver: WebDriver, element, 
+                                image_data: str, captcha_type: str, captcha_id: str) -> bool:
+        """处理人工验证码流程"""
+        try:
+            # 存储验证码任务供人工处理
+            self.pending_captchas[captcha_id] = {
+                'driver': driver,
+                'element': element,
+                'image': image_data,
+                'type': captcha_type,
+                'timestamp': time.time()
+            }
+            
+            logger.info(f"👤 验证码需要人工处理，ID: {captcha_id}")
+            return False  # 需要人工干预
+            
+        except Exception as e:
+            logger.error(f"人工处理流程设置失败: {e}")
+            return False
+    
+    def _execute_slide_action(self, driver: WebDriver, element, distance: int) -> bool:
+        """执行滑动操作"""
+        try:
+            from selenium.webdriver.common.action_chains import ActionChains
+            import random
+            
+            # 找到滑块元素
+            slider = element.find_element(By.CLASS_NAME, 'nc-lang-cnt')
+            if not slider:
+                return False
+            
+            # 模拟拖拽动作
+            action = ActionChains(driver)
+            action.click_and_hold(slider)
+            
+            # 分段滑动模拟人工
+            steps = 15
+            for i in range(steps):
+                vertical_move = random.randint(-2, 2)
+                action.move_by_offset(distance // steps, vertical_move)
+                action.pause(random.uniform(0.02, 0.08))
+            
+            action.release()
+            action.perform()
+            
+            time.sleep(2)  # 等待验证结果
+            return True
+            
+        except Exception as e:
+            logger.error(f"滑动操作执行失败: {e}")
+            return False
     
     def _find_captcha_container(self, slider_element):
         """查找包含整个验证码的容器元素"""
@@ -663,6 +789,112 @@ class CaptchaManager:
     def submit_captcha_solution(self, captcha_id: str, solution: str) -> bool:
         """提交验证码解决方案"""
         return self.manual_solver.submit_captcha_solution(captcha_id, solution)
+
+
+# 全局验证码管理器实例
+captcha_manager = CaptchaManager()
+
+
+# AI增强验证码处理功能
+class AICaptchaEnhancement:
+    """AI验证码增强处理"""
+    
+    def __init__(self):
+        self.ai_handler = None
+        self.ai_available = False
+        self._init_ai_support()
+    
+    def _init_ai_support(self):
+        """初始化AI支持"""
+        try:
+            if AI_SUPPORT_AVAILABLE:
+                from .ai_captcha_handler import EnhancedSlideCaptchaHandler
+                self.ai_handler = EnhancedSlideCaptchaHandler()
+                self.ai_available = True
+                logger.info("✅ AI验证码支持已启用")
+            else:
+                logger.info("ℹ️ AI验证码支持不可用")
+        except Exception as e:
+            logger.warning(f"AI验证码初始化失败: {e}")
+            self.ai_available = False
+    
+    def enhance_slide_captcha_processing(self, driver: WebDriver, 
+                                       captcha_element, 
+                                       background_image_path: str) -> bool:
+        """
+        使用AI增强滑动验证码处理
+        
+        Args:
+            driver: WebDriver实例
+            captcha_element: 验证码元素
+            background_image_path: 背景图片路径
+            
+        Returns:
+            处理是否成功
+        """
+        if not self.ai_available or not self.ai_handler:
+            logger.info("🤖 AI支持不可用，使用传统方法")
+            return False
+        
+        try:
+            logger.info("🤖 启动AI滑动验证码处理...")
+            
+            # 获取滑块元素位置
+            slider_location = (captcha_element.location['x'], captcha_element.location['y'])
+            
+            # 使用AI处理
+            success = self.ai_handler.handle_with_ai(
+                background_image_path, 
+                slider_location, 
+                driver
+            )
+            
+            if success:
+                logger.info("✅ AI滑动验证码处理成功")
+                return True
+            else:
+                logger.warning("❌ AI滑动验证码处理失败，回退到人工处理")
+                return False
+                
+        except Exception as e:
+            logger.error(f"AI滑动验证码处理出错: {e}")
+            return False
+    
+    def collect_training_data(self, image_path: str, target_position: Tuple[int, int]):
+        """收集训练数据"""
+        if self.ai_available and self.ai_handler:
+            try:
+                self.ai_handler._collect_training_data(image_path, target_position)
+                logger.debug(f"📊 收集训练数据: {image_path} -> {target_position}")
+            except Exception as e:
+                logger.warning(f"收集训练数据失败: {e}")
+
+
+# 全局AI增强实例
+ai_enhancement = AICaptchaEnhancement()
+
+
+def get_ai_enhancement() -> AICaptchaEnhancement:
+    """获取AI增强实例"""
+    return ai_enhancement
+
+
+def enhance_captcha_with_ai(driver: WebDriver, captcha_element, 
+                          background_image_path: str) -> bool:
+    """
+    便捷函数：使用AI增强验证码处理
+    
+    Args:
+        driver: WebDriver实例
+        captcha_element: 验证码元素
+        background_image_path: 背景图片路径
+        
+    Returns:
+        处理是否成功
+    """
+    return ai_enhancement.enhance_slide_captcha_processing(
+        driver, captcha_element, background_image_path
+    )
 
 
 # 全局验证码管理器实例
