@@ -181,9 +181,10 @@ class ManualCaptchaSolver(CaptchaSolver):
             from selenium.webdriver.common.action_chains import ActionChains
             import random
             
-            # 找到滑块元素
-            slider = element.find_element(By.CLASS_NAME, 'nc-lang-cnt')
+            # 多种方式查找滑块元素
+            slider = self._find_slider_element(driver, element)
             if not slider:
+                logger.error("❌ 无法找到滑块元素")
                 return False
             
             # 模拟拖拽动作
@@ -206,6 +207,81 @@ class ManualCaptchaSolver(CaptchaSolver):
         except Exception as e:
             logger.error(f"滑动操作执行失败: {e}")
             return False
+    
+    def _find_slider_element(self, driver: WebDriver, container_element):
+        """智能查找滑块元素"""
+        try:
+            # 方法1: 尝试多种常见的滑块CSS选择器
+            slider_selectors = [
+                '.nc-lang-cnt',
+                '.slider',
+                '.slide-btn',
+                '.drag-btn',
+                '.nc-slider-btn',
+                '[class*="slider"]',
+                '[class*="drag"]',
+                '[class*="slide"]'
+            ]
+            
+            # 首先在容器元素内查找
+            for selector in slider_selectors:
+                try:
+                    slider = container_element.find_element(By.CSS_SELECTOR, selector)
+                    if slider and slider.is_displayed():
+                        logger.info(f"✅ 在容器内找到滑块元素: {selector}")
+                        return slider
+                except:
+                    continue
+            
+            # 方法2: 在整个页面中查找
+            for selector in slider_selectors:
+                try:
+                    sliders = driver.find_elements(By.CSS_SELECTOR, selector)
+                    for slider in sliders:
+                        if slider.is_displayed() and slider.is_enabled():
+                            # 检查是否在验证码区域内
+                            rect = slider.rect
+                            container_rect = container_element.rect
+                            if (container_rect['x'] <= rect['x'] <= container_rect['x'] + container_rect['width'] and
+                                container_rect['y'] <= rect['y'] <= container_rect['y'] + container_rect['height']):
+                                logger.info(f"✅ 在页面中找到滑块元素: {selector}")
+                                return slider
+                except:
+                    continue
+            
+            # 方法3: 通过XPath查找包含特定文本的元素
+            try:
+                xpath_selectors = [
+                    "//*[contains(@class, 'slider') or contains(@class, 'drag')]",
+                    "//*[@class='nc-lang-cnt']",
+                    "//*[contains(text(), '滑动') or contains(text(), '拖动')]"
+                ]
+                
+                for xpath in xpath_selectors:
+                    elements = driver.find_elements(By.XPATH, xpath)
+                    for elem in elements:
+                        if elem.is_displayed() and elem.is_enabled():
+                            logger.info(f"✅ 通过XPath找到元素: {xpath}")
+                            return elem
+            except:
+                pass
+            
+            # 方法4: 查找具有特定属性的元素
+            try:
+                elements = driver.find_elements(By.XPATH, "//*[@*[contains(., 'slider')] or @*[contains(., 'drag')]]")
+                for elem in elements:
+                    if elem.is_displayed() and elem.is_enabled():
+                        logger.info("✅ 通过属性匹配找到滑块元素")
+                        return elem
+            except:
+                pass
+            
+            logger.warning("❌ 无法通过任何方法找到滑块元素")
+            return None
+            
+        except Exception as e:
+            logger.error(f"查找滑块元素失败: {e}")
+            return None
     
     def _find_captcha_container(self, slider_element):
         """查找包含整个验证码的容器元素"""
@@ -413,20 +489,21 @@ class ManualCaptchaSolver(CaptchaSolver):
             # 提取验证码背景图片和滑块图片
             captcha_data = self._extract_captcha_images(container_element)
             
-            # 找到滑块元素
-            slider = element.find_element(By.CLASS_NAME, 'nc-lang-cnt')
+            # 智能查找滑块元素
+            slider = self._find_slider_element(driver, container_element)
             if not slider:
+                logger.error("❌ 无法找到滑块元素，无法执行滑动操作")
                 return False
             
             # 存储验证码信息供前端使用
             self._store_captcha_info(element, captcha_data, solution)
             
+            # 根据solution值计算滑动距离
+            distance = int(solution) if solution.isdigit() else 300
+            
             # 模拟拖拽动作
             action = ActionChains(driver)
             action.click_and_hold(slider)
-            
-            # 根据solution值计算滑动距离
-            distance = int(solution) if solution.isdigit() else 300
             
             # 分段滑动模拟人工
             steps = 15  # 增加步数使滑动更自然
