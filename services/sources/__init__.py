@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from .base import BaseJobSource
 from .lagou import LagouSource
+from .lagou_browser import LagouBrowserSource, LagouHybridSource
 from .boss import BossSource
 from .zhaopin import ZhaopinSource
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 # 所有已实现的招聘源：source_id -> 实例
 SOURCE_REGISTRY = {
     LagouSource.source_id: LagouSource(),
+    LagouBrowserSource.source_id: LagouBrowserSource(),
+    LagouHybridSource.source_id: LagouHybridSource(),
     BossSource.source_id: BossSource(),
     ZhaopinSource.source_id: ZhaopinSource(),
 }

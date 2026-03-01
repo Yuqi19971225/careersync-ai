@@ -58,6 +58,24 @@ LOG_LEVEL = _logging_config.get('log_level', 'INFO')
 LOG_MAX_BYTES = _logging_config.get('max_bytes', 10485760)  # 10MB
 LOG_BACKUP_COUNT = _logging_config.get('backup_count', 5)
 
+# 代理配置
+_proxy_config = _file_config.get('proxy') or {}
+PROXY_HTTP = os.getenv('PROXY_HTTP') or _proxy_config.get('http') or 'http://127.0.0.1:7890'
+PROXY_HTTPS = os.getenv('PROXY_HTTPS') or _proxy_config.get('https') or 'http://127.0.0.1:7890'
+PROXY_ENABLED = (
+    os.getenv('PROXY_ENABLED')
+    or str(_proxy_config.get('enabled', 'false')).lower()
+    or 'false'
+) in ('1', 'true', 'yes')
+
+# 代理池配置
+PROXY_POOL = _proxy_config.get('pool', [])
+PROXY_ROTATE = (
+    os.getenv('PROXY_ROTATE')
+    or str(_proxy_config.get('rotate', 'false')).lower()
+    or 'false'
+) in ('1', 'true', 'yes')
+
 
 def setup_logging(level=logging.INFO, log_file=None, max_bytes=None, backup_count=None):
     """配置全局日志 - 支持文件日志和控制台日志"""
@@ -103,3 +121,9 @@ def setup_logging(level=logging.INFO, log_file=None, max_bytes=None, backup_coun
         print(f"📝 日志文件路径: {log_path}")
         print(f"📊 日志级别: {logging.getLevelName(log_level)}")
         print(f"🔄 日志轮转: 每 {max_bytes or LOG_MAX_BYTES} 字节，保留 {backup_count or LOG_BACKUP_COUNT} 个备份")
+        
+        # 显示代理配置
+        if PROXY_ENABLED:
+            print(f"🌐 代理已启用: HTTP={PROXY_HTTP}, HTTPS={PROXY_HTTPS}")
+        else:
+            print("🌐 代理未启用")

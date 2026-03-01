@@ -2,11 +2,28 @@
   "server": {"host": "0.0.0.0", "port": 8443},
   "debug": true,
   "qwen": {"model": "qwen-turbo"},
-  "job_sources": ["lagou"],
+  "job_sources": ["lagou_hybrid", "boss", "zhaopin"],
   "logging": {
     "log_file": "app.log",
     "log_level": "INFO",
     "max_bytes": 10485760,
     "backup_count": 5
+  },
+  "proxy": {
+    "http": "http://127.0.0.1:7890",
+    "https": "http://127.0.0.1:7890",
+    "enabled": false,
+    "pool": [
+      {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"},
+      {"http": "http://127.0.0.1:7891", "https": "http://127.0.0.1:7891"},
+      {"http": "http://127.0.0.1:7892", "https": "http://127.0.0.1:7892"}
+    ],
+    "rotate": false
+  },
+  "browser_automation": {
+    "enabled": true,
+    "headless": true,
+    "timeout": 30,
+    "preferred_sources": ["lagou_hybrid", "lagou_browser"]
   }
 }

@@ -10,6 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from .base import BaseJobSource, normalize_job, extract_requirements
+from services.proxy_manager import proxy_manager
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,15 @@ class LagouSource(BaseJobSource):
         super().__init__(timeout, max_per_page)
         # 使用Session保持会话
         self.session = requests.Session()
+        
+        # 配置代理
+        self.proxies = proxy_manager.get_session_proxies()
+        if self.proxies:
+            self.session.proxies.update(self.proxies)
+            logger.info("[拉勾网] 已配置代理: %s", self.proxies)
+        else:
+            logger.info("[拉勾网] 代理未启用，使用直连")
+        
         # 更真实的浏览器headers
         self.headers.update({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -37,9 +47,13 @@ class LagouSource(BaseJobSource):
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1'
         })
+        
         # 初始化时先访问首页获取必要cookie
         try:
-            self.session.get('https://www.lagou.com', headers=self.headers, timeout=self.timeout)
+            self.session.get('https://www.lagou.com', 
+                           headers=self.headers, 
+                           timeout=self.timeout,
+                           proxies=self.proxies)
             logger.debug("[拉勾网] 已获取初始cookie")
         except Exception as e:
             logger.warning("[拉勾网] 初始化cookie失败: %s", e)
@@ -47,9 +61,12 @@ class LagouSource(BaseJobSource):
     def test_connection(self) -> bool:
         """测试拉勾网连接状态"""
         try:
+            # 每次测试都获取最新的代理配置
+            test_proxies = proxy_manager.get_session_proxies()
             response = self.session.get('https://www.lagou.com', 
                                       headers=self.headers, 
-                                      timeout=self.timeout)
+                                      timeout=self.timeout,
+                                      proxies=test_proxies)
             # 检查是否返回验证码页面
             if '滑动验证' in response.text or 'nocaptcha' in response.text:
                 logger.debug("[拉勾网] 连接测试: 触发验证码")
@@ -91,7 +108,13 @@ class LagouSource(BaseJobSource):
         
         # 使用session发送请求
         try:
-            response = self.session.get(url, params=params, headers=self.headers, timeout=self.timeout)
+            # 每次请求都获取最新的代理配置（支持轮换）
+            request_proxies = proxy_manager.get_session_proxies()
+            response = self.session.get(url, 
+                                      params=params, 
+                                      headers=self.headers, 
+                                      timeout=self.timeout,
+                                      proxies=request_proxies)
             response.raise_for_status()
             html = response.text
         except Exception as e:
