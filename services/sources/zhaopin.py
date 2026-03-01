@@ -18,3 +18,11 @@ class ZhaopinSource(BaseJobSource):
     def search(self, keyword: str, city: str = '全国', page: int = 1) -> List[Dict[str, Any]]:
         logger.debug("[智联招聘] 暂未实现爬取逻辑，返回空列表")
         return []
+    
+    def is_available(self) -> dict:
+        """智联招聘当前不可用"""
+        return {
+            'available': False,
+            'message': '暂未实现爬取逻辑，可按站点接口/页面实现',
+            'last_checked': None
+        }

@@ -24,19 +24,54 @@ def register_routes(app, career_sync_ai):
         city = data.get('city', '全国')
         page = data.get('page', 1)
         source_ids = data.get('sources')  # 可选：指定招聘源，如 ["lagou", "boss"]
+        
         if not keyword:
             return jsonify({'error': 'CareerSync AI: 缺少搜索关键词'}), 400
+            
+        if not source_ids or len(source_ids) == 0:
+            return jsonify({'error': 'CareerSync AI: 请至少选择一个招聘网站'}), 400
+        
         try:
+            # 检查所选源的可用性
+            from services.sources import get_source_status
+            unavailable_sources = []
+            source_messages = {}
+            
+            for source_id in source_ids:
+                try:
+                    status_info = get_source_status(source_id)
+                    if not status_info.get('available', True):
+                        unavailable_sources.append(source_id)
+                        source_messages[source_id] = status_info.get('message', '源不可用')
+                except Exception as e:
+                    unavailable_sources.append(source_id)
+                    source_messages[source_id] = f'状态检查失败: {str(e)}'
+                    logger.warning("检查源 %s 状态时出错: %s", source_id, e)
+            
+            # 执行搜索
             jobs = career_sync_ai.search_jobs(keyword, city, page, source_ids=source_ids)
-            return jsonify({
+            
+            response_data = {
                 'success': True,
                 'system': 'CareerSync AI',
                 'jobs': jobs,
-                'total': len(jobs)
-            })
+                'total': len(jobs),
+                'selected_sources': source_ids
+            }
+            
+            # 添加源状态信息
+            if unavailable_sources:
+                response_data['warnings'] = {
+                    'unavailable_sources': unavailable_sources,
+                    'messages': source_messages
+                }
+                logger.warning("以下源不可用: %s", ', '.join(unavailable_sources))
+            
+            return jsonify(response_data)
+            
         except Exception as e:
             logger.exception("搜索职位失败")
-            return jsonify({'error': 'CareerSync AI: 搜索职位失败'}), 500
+            return jsonify({'error': f'CareerSync AI: 搜索职位失败 - {str(e)}'}), 500
 
     @app.route('/api/match_resume', methods=['POST'])
     def match_resume():
@@ -91,10 +126,26 @@ def register_routes(app, career_sync_ai):
     @app.route('/api/job_sources', methods=['GET'])
     def job_sources():
         """返回已注册的招聘源 id 列表及当前启用的源"""
-        from services.sources import list_source_ids
+        from services.sources import list_source_ids, get_source_status
+        available_sources = list_source_ids()
+        
+        # 获取每个源的状态信息
+        source_statuses = {}
+        for source_id in available_sources:
+            try:
+                status_info = get_source_status(source_id)
+                source_statuses[source_id] = status_info
+            except Exception as e:
+                logger.warning("获取源 %s 状态失败: %s", source_id, e)
+                source_statuses[source_id] = {
+                    'available': False,
+                    'message': '状态检查失败'
+                }
+        
         return jsonify({
-            'available': list_source_ids(),
+            'available': available_sources,
             'enabled': career_sync_ai.system_info.get('job_sources'),
+            'statuses': source_statuses
         })
 
     @app.route('/api/health', methods=['GET'])

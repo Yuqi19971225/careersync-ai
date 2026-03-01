@@ -19,3 +19,11 @@ class BossSource(BaseJobSource):
         # BOSS 直聘多为前端渲染或接口加密，需分析接口或使用浏览器自动化
         logger.debug("[BOSS直聘] 暂未实现爬取逻辑，返回空列表")
         return []
+    
+    def is_available(self) -> dict:
+        """BOSS直聘当前不可用"""
+        return {
+            'available': False,
+            'message': '暂未实现爬取逻辑，站点有强反爬需单独适配',
+            'last_checked': None
+        }
