@@ -1,4 +1,5 @@
 # Virtual Environment
+.venv/
 careersync_env/
 
 # Python
@@ -35,11 +36,28 @@ Thumbs.db
 
 # Logs and temporary files
 *.log
+logs/
 app.log
 cookies.txt
 
-# Test files
+# Data files
+data/training/images/
+data/training/labels/
+metadata.json
+
+# Model files
+models/
+*.h5
+*.pb
+*.ckpt
+
+# Test and demo files
 tests/
-demos/
+scripts/
 *.test.py
 *.demo.py
+
+# Local configuration files
+config.local.json
+.env
+.env.local
