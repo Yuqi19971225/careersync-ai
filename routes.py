@@ -4,13 +4,18 @@
 import logging
 from datetime import datetime
 
-from flask import request, jsonify
+from flask import request, jsonify, send_from_directory
 
 logger = logging.getLogger(__name__)
 
 
 def register_routes(app, career_sync_ai):
     """将 API 路由注册到 Flask 应用"""
+
+    @app.route('/')
+    def index():
+        """前端页面"""
+        return send_from_directory(app.static_folder or 'static', 'index.html')
 
     @app.route('/api/search_jobs', methods=['POST'])
     def search_jobs():

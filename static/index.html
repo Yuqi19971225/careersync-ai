@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerSync AI - 智能职业匹配与简历优化</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">◇</span>
+        <h1>CareerSync AI</h1>
+      </div>
+      <p class="tagline">智能职业匹配与简历优化</p>
+      <div class="header-meta">
+        <span id="system-version">—</span>
+        <span id="qwen-status" class="badge">千问</span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button type="button" class="tab active" data-tab="search">职位搜索</button>
+      <button type="button" class="tab" data-tab="match">简历匹配</button>
+      <button type="button" class="tab" data-tab="optimize">简历优化</button>
+    </nav>
+
+    <main class="main">
+      <!-- 职位搜索 -->
+      <section id="panel-search" class="panel active">
+        <div class="form-row">
+          <input type="text" id="search-keyword" placeholder="职位关键词，如：Python、前端" autocomplete="off">
+          <input type="text" id="search-city" placeholder="城市，默认全国" value="全国" autocomplete="off">
+          <button type="button" id="btn-search" class="btn btn-primary">搜索职位</button>
+        </div>
+        <div id="search-result" class="result-box"></div>
+      </section>
+
+      <!-- 简历匹配 -->
+      <section id="panel-match" class="panel">
+        <div class="form-row">
+          <input type="text" id="match-keyword" placeholder="目标职位关键词" autocomplete="off">
+          <input type="text" id="match-city" placeholder="城市" value="全国" autocomplete="off">
+        </div>
+        <div class="textarea-wrap">
+          <label for="match-resume">粘贴简历正文</label>
+          <textarea id="match-resume" rows="6" placeholder="粘贴您的简历内容，用于与职位匹配…"></textarea>
+        </div>
+        <button type="button" id="btn-match" class="btn btn-primary">开始匹配</button>
+        <div id="match-result" class="result-box"></div>
+      </section>
+
+      <!-- 简历优化 -->
+      <section id="panel-optimize" class="panel">
+        <div class="form-row">
+          <input type="text" id="optimize-keyword" placeholder="目标职位关键词" autocomplete="off">
+          <input type="text" id="optimize-city" placeholder="城市" value="全国" autocomplete="off">
+        </div>
+        <div class="textarea-wrap">
+          <label for="optimize-resume">原始简历</label>
+          <textarea id="optimize-resume" rows="6" placeholder="粘贴简历，获取针对目标职位的优化建议与改写版…"></textarea>
+        </div>
+        <button type="button" id="btn-optimize" class="btn btn-primary">获取优化建议</button>
+        <div id="optimize-result" class="result-box"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>CareerSync AI · 职位搜索 · 简历匹配 · 简历优化</p>
+    </footer>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
