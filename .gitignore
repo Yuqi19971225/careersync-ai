@@ -52,7 +52,6 @@ models/
 *.ckpt
 
 # Test and demo files
-tests/
 scripts/
 *.test.py
 *.demo.py
