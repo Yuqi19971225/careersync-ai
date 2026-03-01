@@ -44,6 +44,13 @@ if _debug_raw is not None:
 else:
     DEBUG = _file_config.get('debug', True)
 
+# 招聘源：启用哪些站点（source_id 列表），不配置则使用全部已注册源
+_job_sources = _file_config.get('job_sources')
+if _job_sources is not None and isinstance(_job_sources, list):
+    JOB_SOURCES = [str(x) for x in _job_sources]
+else:
+    JOB_SOURCES = None  # 表示“全部源”
+
 
 def setup_logging(level=logging.INFO):
     """配置全局日志"""

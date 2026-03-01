@@ -5,12 +5,17 @@ from .crawler import JobCrawler
 from .optimizer import AIOptimizer
 from .matcher import ResumeMatcher
 
+try:
+    from config import JOB_SOURCES
+except ImportError:
+    JOB_SOURCES = None
+
 
 class CareerSyncAI:
     """统一入口：职位搜索、简历匹配、简历优化"""
 
     def __init__(self):
-        self.crawler = JobCrawler()
+        self.crawler = JobCrawler(default_source_ids=JOB_SOURCES)
         self.optimizer = AIOptimizer()
         self.matcher = ResumeMatcher()
         self.cache = {}
@@ -25,14 +30,15 @@ class CareerSyncAI:
                 '实时数据分析'
             ],
             'qwen_enabled': bool(self.optimizer._qwen),
+            'job_sources': self.crawler.default_source_ids,
         }
 
-    def search_jobs(self, keyword, city='全国', page=1):
-        """搜索职位（带简单缓存）"""
-        cache_key = f"{keyword}_{city}_{page}"
+    def search_jobs(self, keyword, city='全国', page=1, source_ids=None):
+        """搜索职位（带简单缓存）。source_ids 可指定本次使用的招聘源，如 ['lagou']。"""
+        cache_key = f"{keyword}_{city}_{page}_{(source_ids or 'default')}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        jobs = self.crawler.crawl_lagou_jobs(keyword, city, page)
+        jobs = self.crawler.crawl_jobs(keyword, city=city, page=page, source_ids=source_ids)
         self.cache[cache_key] = jobs
         return jobs
 

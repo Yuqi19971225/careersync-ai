@@ -23,10 +23,11 @@ def register_routes(app, career_sync_ai):
         keyword = data.get('keyword', '')
         city = data.get('city', '全国')
         page = data.get('page', 1)
+        source_ids = data.get('sources')  # 可选：指定招聘源，如 ["lagou", "boss"]
         if not keyword:
             return jsonify({'error': 'CareerSync AI: 缺少搜索关键词'}), 400
         try:
-            jobs = career_sync_ai.search_jobs(keyword, city, page)
+            jobs = career_sync_ai.search_jobs(keyword, city, page, source_ids=source_ids)
             return jsonify({
                 'success': True,
                 'system': 'CareerSync AI',
@@ -86,6 +87,15 @@ def register_routes(app, career_sync_ai):
     @app.route('/api/system_info', methods=['GET'])
     def system_info():
         return jsonify(career_sync_ai.system_info)
+
+    @app.route('/api/job_sources', methods=['GET'])
+    def job_sources():
+        """返回已注册的招聘源 id 列表及当前启用的源"""
+        from services.sources import list_source_ids
+        return jsonify({
+            'available': list_source_ids(),
+            'enabled': career_sync_ai.system_info.get('job_sources'),
+        })
 
     @app.route('/api/health', methods=['GET'])
     def health_check():

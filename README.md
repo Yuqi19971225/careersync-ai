@@ -174,11 +174,23 @@ SERVER_PORT=8080 python3 app.py
 | GET | `/` | 前端页面 |
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/system_info` | 系统信息（含版本、是否启用千问等） |
-| POST | `/api/search_jobs` | 职位搜索，Body: `{ "keyword", "city?", "page?" }` |
+| POST | `/api/search_jobs` | 职位搜索，Body: `{ "keyword", "city?", "page?", "sources?" }`（sources 指定招聘源如 `["lagou"]`） |
 | POST | `/api/match_resume` | 简历匹配，Body: `{ "resume", "keyword", "city?" }` |
 | POST | `/api/optimize_resume` | 简历优化，Body: `{ "resume", "keyword", "city?" }` |
+| GET  | `/api/job_sources` | 可用招聘源 id 列表及当前启用列表 |
 
 请求体均为 JSON；缺失的 `city` 默认为「全国」，`page` 默认为 1。
+
+**招聘源配置**：`config.json` 中 `job_sources` 指定启用的站点（如 `["lagou"]`）；不配置则使用全部已注册源。请求时可传 `sources` 覆盖本次使用的源。
+
+---
+
+## 扩展新招聘站
+
+1. 在 `services/sources/` 下新建模块（如 `xxx.py`）。
+2. 继承 `BaseJobSource`，实现 `source_id`、`source_name` 和 `search(keyword, city, page)`，返回 `normalize_job(...)` 构造的职位列表。
+3. 在 `services/sources/__init__.py` 的 `SOURCE_REGISTRY` 中注册该源。
+4. 在 `config.json` 的 `job_sources` 中加入对应 `source_id`（或留空使用全部）。
 
 ---
 
@@ -199,10 +211,15 @@ careersync-ai/
 │   └── js/app.js
 └── services/           # 业务逻辑
     ├── career_sync.py  # 主系统编排
-    ├── crawler.py      # 职位爬虫
+    ├── crawler.py      # 多招聘源聚合爬虫
     ├── matcher.py      # 简历-职位匹配
     ├── optimizer.py    # 简历优化（千问 + 规则）
-    └── qwen_client.py  # 千问 API 客户端
+    ├── qwen_client.py  # 千问 API 客户端
+    └── sources/        # 可扩展招聘源（每站一个模块）
+        ├── base.py     # 基类与统一职位格式
+        ├── lagou.py    # 拉勾网
+        ├── boss.py     # BOSS直聘（占位）
+        └── zhaopin.py  # 智联招聘（占位）
 ```
 
 ---
