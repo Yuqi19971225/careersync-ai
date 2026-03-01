@@ -30,6 +30,25 @@
     </nav>
 
     <main class="main">
+      <!-- 验证码处理弹窗 -->
+      <div id="captcha-modal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>🤖 验证码处理</h3>
+            <button class="modal-close" id="close-captcha-modal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="captcha-container">
+              <!-- 验证码内容将在这里动态加载 -->
+            </div>
+            <div class="captcha-input-area">
+              <input type="text" id="captcha-solution" placeholder="请输入验证码答案" autocomplete="off">
+              <button id="submit-captcha" class="btn btn-primary">提交</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- 职位搜索 -->
       <section id="panel-search" class="panel active">
         <!-- 拉勾网提示通知 -->

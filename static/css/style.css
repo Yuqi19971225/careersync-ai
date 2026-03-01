@@ -573,3 +573,403 @@ textarea {
 .source-unavailable-notice li {
   margin-bottom: 0.25rem;
 }
+
+/* 验证码模态框样式 */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  background-color: #ffffff;
+  margin: 10% auto;
+  padding: 0;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.captcha-container {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.captcha-image {
+  max-width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.captcha-type-info {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.captcha-operation-tip {
+  font-size: 0.875rem;
+  color: #374151;
+  background: #f3f4f6;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border-left: 4px solid #3b82f6;
+  line-height: 1.5;
+}
+
+/* 滑动验证码样式 */
+.slide-captcha-container {
+  position: relative;
+  margin-bottom: 20px;
+  user-select: none;
+}
+
+.slide-background {
+  position: relative;
+  margin-bottom: 15px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.captcha-bg-image {
+  width: 100%;
+  display: block;
+}
+
+.slide-track {
+  position: relative;
+  height: 44px;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 22px;
+  margin: 0 10px;
+  overflow: hidden;
+}
+
+.slide-progress {
+  position: absolute;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 22px;
+  width: 0;
+  transition: width 0.1s ease;
+}
+
+.slide-slider {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  left: 0;
+  top: -1px;
+  z-index: 10;
+}
+
+.slide-slider:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.slide-slider.dragging {
+  cursor: grabbing;
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slider-icon {
+  font-size: 18px;
+  color: #6b7280;
+  font-weight: bold;
+}
+
+.slide-piece {
+  position: absolute;
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  z-index: 5;
+}
+
+.captcha-slider-image {
+  display: block;
+  max-height: 30px;
+}
+
+/* 完整图片滑动样式 */
+.slide-captcha-full {
+  position: relative;
+  margin-bottom: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.captcha-full-image {
+  width: 100%;
+  display: block;
+}
+
+.slide-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.slide-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 60px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #3b82f6;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b82f6;
+  cursor: grab;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.slide-handle:hover {
+  background: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slide-handle.dragging {
+  cursor: grabbing;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .slide-track {
+    height: 36px;
+  }
+  
+  .slide-slider {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .slider-icon {
+    font-size: 16px;
+  }
+  
+  .slide-handle {
+    width: 50px;
+    height: 35px;
+    font-size: 11px;
+  }
+}
+
+.captcha-input-area {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.captcha-input-area input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.captcha-input-area input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.captcha-input-area button {
+  padding: 12px 24px;
+  white-space: nowrap;
+}
+
+.captcha-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+.captcha-loading .spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.captcha-task-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.captcha-task-item {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.captcha-task-item:last-child {
+  border-bottom: none;
+}
+
+.captcha-task-item:hover {
+  background-color: #f9fafb;
+}
+
+.captcha-task-item.active {
+  background-color: #eff6ff;
+  border-left: 3px solid #3b82f6;
+}
+
+.captcha-task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.captcha-task-type {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.875rem;
+}
+
+.captcha-task-time {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.captcha-task-preview {
+  font-size: 0.875rem;
+  color: #4b5563;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 5% auto;
+    width: 95%;
+  }
+  
+  .captcha-input-area {
+    flex-direction: column;
+  }
+  
+  .captcha-input-area button {
+    width: 100%;
+  }
+  
+  .slide-captcha-container {
+    margin-bottom: 15px;
+  }
+  
+  .slide-track {
+    margin: 0 5px;
+  }
+  
+  .slide-piece {
+    left: 10px;
+  }
+  
+  .slide-handle {
+    width: 45px;
+    height: 30px;
+    font-size: 10px;
+  }
+}

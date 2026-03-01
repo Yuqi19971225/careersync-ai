@@ -194,7 +194,7 @@ SERVER_PORT=8080 python3 app.py
 
 ---
 
-## 项目结构（简要）
+## 项目结构（完整）
 
 ```
 careersync-ai/
@@ -209,17 +209,23 @@ careersync-ai/
 │   ├── index.html
 │   ├── css/style.css
 │   └── js/app.js
-└── services/           # 业务逻辑
-    ├── career_sync.py  # 主系统编排
-    ├── crawler.py      # 多招聘源聚合爬虫
-    ├── matcher.py      # 简历-职位匹配
-    ├── optimizer.py    # 简历优化（千问 + 规则）
-    ├── qwen_client.py  # 千问 API 客户端
-    └── sources/        # 可扩展招聘源（每站一个模块）
-        ├── base.py     # 基类与统一职位格式
-        ├── lagou.py    # 拉勾网
-        ├── boss.py     # BOSS直聘（占位）
-        └── zhaopin.py  # 智联招聘（占位）
+├── services/           # 业务逻辑
+│   ├── career_sync.py  # 主系统编排
+│   ├── crawler.py      # 多招聘源聚合爬虫
+│   ├── matcher.py      # 简历-职位匹配
+│   ├── optimizer.py    # 简历优化（千问 + 规则）
+│   ├── qwen_client.py  # 千问 API 客户端
+│   └── sources/        # 可扩展招聘源（每站一个模块）
+│       ├── base.py     # 基类与统一职位格式
+│       ├── lagou.py    # 拉勾网
+│       ├── boss.py     # BOSS直聘（占位）
+│       └── zhaopin.py  # 智联招聘（占位）
+├── demos/              # 演示脚本
+│   ├── demo_captcha.py         # 验证码处理功能演示
+│   └── demo_slide_captcha.py   # 滑动验证码增强功能演示
+└── tests/              # 测试脚本
+    ├── test_captcha.py         # 验证码处理功能测试
+    └── test_slide_captcha.py   # 滑动验证码功能测试
 ```
 
 ---

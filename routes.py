@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 
 from flask import request, jsonify, send_from_directory
+from services.captcha_handler import get_captcha_manager
 
 logger = logging.getLogger(__name__)
 
@@ -156,3 +157,58 @@ def register_routes(app, career_sync_ai):
             'version': career_sync_ai.system_info['version'],
             'timestamp': datetime.now().isoformat()
         })
+    
+    @app.route('/api/captcha/pending', methods=['GET'])
+    def get_pending_captchas():
+        """获取待处理的验证码任务"""
+        try:
+            captcha_manager = get_captcha_manager()
+            pending_captchas = captcha_manager.get_pending_captchas()
+            
+            # 转换为前端友好的格式
+            captcha_list = []
+            for captcha_id, task in pending_captchas.items():
+                captcha_list.append({
+                    'id': captcha_id,
+                    'type': task.get('type', 'unknown'),
+                    'image': task.get('image', ''),
+                    'timestamp': task.get('timestamp', 0)
+                })
+            
+            return jsonify({
+                'pending_captchas': captcha_list,
+                'count': len(captcha_list)
+            })
+        
+        except Exception as e:
+            logger.error("获取待处理验证码失败: %s", e)
+            return jsonify({'error': '获取验证码任务失败'}), 500
+    
+    @app.route('/api/captcha/submit', methods=['POST'])
+    def submit_captcha_solution():
+        """提交验证码解决方案"""
+        try:
+            data = request.json or {}
+            captcha_id = data.get('captcha_id')
+            solution = data.get('solution')
+            
+            if not captcha_id or not solution:
+                return jsonify({'error': '缺少验证码ID或解决方案'}), 400
+            
+            captcha_manager = get_captcha_manager()
+            success = captcha_manager.submit_captcha_solution(captcha_id, solution)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': '验证码解决方案已提交'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '验证码解决方案提交失败'
+                }), 400
+                
+        except Exception as e:
+            logger.error("提交验证码解决方案失败: %s", e)
+            return jsonify({'error': '提交验证码解决方案失败'}), 500

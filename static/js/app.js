@@ -2,6 +2,7 @@
   'use strict';
 
   const API_BASE = '';
+  let currentCaptchaTask = null;
 
   // 关闭通知功能
   function initNoticeClose() {
@@ -31,7 +32,11 @@
   }
 
   // 页面加载完成后初始化
-  document.addEventListener('DOMContentLoaded', initNoticeClose);
+  document.addEventListener('DOMContentLoaded', function() {
+    initNoticeClose();
+    initCaptchaModal();
+    startCaptchaPolling();
+  });
 
   function request(method, path, body) {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -372,6 +377,362 @@
     var div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+  }
+  
+  // 验证码处理功能
+  function initCaptchaModal() {
+    const modal = document.getElementById('captcha-modal');
+    const closeBtn = document.getElementById('close-captcha-modal');
+    const submitBtn = document.getElementById('submit-captcha');
+    const solutionInput = document.getElementById('captcha-solution');
+    
+    if (!modal || !closeBtn || !submitBtn) return;
+    
+    // 关闭模态框
+    closeBtn.addEventListener('click', function() {
+      closeModal();
+    });
+    
+    // 点击背景关闭
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+    
+    // 提交验证码
+    submitBtn.addEventListener('click', submitCaptchaSolution);
+    
+    // 回车提交
+    solutionInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitCaptchaSolution();
+      }
+    });
+    
+    function closeModal() {
+      modal.style.display = 'none';
+      currentCaptchaTask = null;
+      solutionInput.value = '';
+    }
+    
+    function submitCaptchaSolution() {
+      if (!currentCaptchaTask || !solutionInput.value.trim()) return;
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
+      
+      post('/api/captcha/submit', {
+        captcha_id: currentCaptchaTask.id,
+        solution: solutionInput.value.trim()
+      })
+      .then(function(response) {
+        if (response.success) {
+          showNotification('✅ 验证码提交成功', 'success');
+          closeModal();
+        } else {
+          showNotification('❌ 验证码提交失败: ' + response.message, 'error');
+        }
+      })
+      .catch(function(error) {
+        showNotification('❌ 提交失败: ' + error.message, 'error');
+      })
+      .finally(function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+      });
+    }
+  }
+  
+  function startCaptchaPolling() {
+    // 每5秒检查一次待处理的验证码
+    setInterval(checkPendingCaptchas, 5000);
+    // 立即检查一次
+    setTimeout(checkPendingCaptchas, 1000);
+  }
+  
+  function checkPendingCaptchas() {
+    get('/api/captcha/pending')
+    .then(function(response) {
+      if (response.count > 0) {
+        showCaptchaModal(response.pending_captchas[0]);
+      }
+    })
+    .catch(function(error) {
+      // 静默处理，避免过多错误提示
+      console.debug('检查验证码失败:', error);
+    });
+  }
+  
+  function showCaptchaModal(captchaTask) {
+    const modal = document.getElementById('captcha-modal');
+    const container = document.getElementById('captcha-container');
+    const solutionInput = document.getElementById('captcha-solution');
+    
+    if (!modal || !container) return;
+    
+    currentCaptchaTask = captchaTask;
+    
+    // 显示验证码内容
+    let captchaHtml = '';
+    
+    // 处理滑动验证码的特殊显示
+    if (captchaTask.type === 'slide' || captchaTask.enhanced_type === 'slide_with_images') {
+      captchaHtml += renderSlideCaptcha(captchaTask);
+    } else {
+      // 其他类型验证码的显示
+      if (captchaTask.image) {
+        captchaHtml += `<img src="data:image/png;base64,${captchaTask.image}" 
+                        class="captcha-image" 
+                        alt="验证码图片">`;
+      }
+    }
+    
+    captchaHtml += `<div class="captcha-type-info">
+                      验证码类型: ${getCaptchaTypeName(captchaTask.type)}
+                    </div>`;
+    
+    // 根据验证码类型添加操作提示
+    const operationTips = getCaptchaOperationTip(captchaTask.type);
+    if (operationTips) {
+      captchaHtml += `<div class="captcha-operation-tip">
+                        ${operationTips}
+                      </div>`;
+    }
+    
+    container.innerHTML = captchaHtml;
+    solutionInput.value = '';
+    
+    // 显示模态框
+    modal.style.display = 'block';
+    
+    // 聚焦到输入框
+    setTimeout(function() {
+      solutionInput.focus();
+    }, 100);
+  }
+  
+  function getCaptchaTypeName(type) {
+    const names = {
+      'slide': '滑动验证码',
+      'text_input': '文本验证码',
+      'image_text': '图片数字验证码',
+      'click': '点选验证码',
+      'geetest': '极验验证码',
+      'unknown': '未知类型验证码'
+    };
+    return names[type] || names['unknown'];
+  }
+  
+  function getCaptchaOperationTip(type) {
+    const tips = {
+      'slide': '请在下方的滑动区域中拖动滑块到正确位置',
+      'text_input': '请在下方输入框中输入看到的验证码文字',
+      'image_text': '请观察上方图片中的数字或文字，在下方输入框中输入答案',
+      'click': '请在下方输入框中输入点击坐标（格式：x1,y1;x2,y2），或直接在图片上点击',
+      'geetest': '请按照极验验证码的要求完成验证操作',
+      'unknown': '请根据图片提示完成相应的验证操作'
+    };
+    return tips[type];
+  }
+  
+  function renderSlideCaptcha(captchaTask) {
+    let html = '';
+    
+    // 获取验证码图片信息
+    const captchaImages = captchaTask.captcha_images || {};
+    
+    // 显示背景图片
+    if (captchaImages.background) {
+      html += `
+        <div class="slide-captcha-container">
+          <div class="slide-background">
+            <img src="${captchaImages.background}" alt="滑动验证码背景" class="captcha-bg-image">
+          </div>
+          
+          <!-- 滑动轨道 -->
+          <div class="slide-track" id="slide-track-${captchaTask.id}">
+            <div class="slide-slider" id="slide-slider-${captchaTask.id}">
+              <span class="slider-icon">→</span>
+            </div>
+            <div class="slide-progress" id="slide-progress-${captchaTask.id}"></div>
+          </div>
+          
+          <!-- 滑块图片 -->
+          ${captchaImages.slider ? 
+            `<div class="slide-piece">
+               <img src="${captchaImages.slider}" alt="滑块" class="captcha-slider-image">
+             </div>` : ''
+          }
+        </div>
+      `;
+      
+      // 添加滑动事件监听
+      setTimeout(() => {
+        initSlideInteraction(captchaTask.id);
+      }, 100);
+    } else if (captchaImages.full_captcha) {
+      // 如果只有完整截图，显示完整图片
+      html += `
+        <div class="slide-captcha-full">
+          <img src="data:image/png;base64,${captchaImages.full_captcha}" 
+               alt="滑动验证码" 
+               class="captcha-full-image">
+          <div class="slide-overlay" id="slide-overlay-${captchaTask.id}">
+            <div class="slide-handle" id="slide-handle-${captchaTask.id}">拖动滑块</div>
+          </div>
+        </div>
+      `;
+      
+      // 添加拖动事件
+      setTimeout(() => {
+        initFullImageSlide(captchaTask.id);
+      }, 100);
+    }
+    
+    return html;
+  }
+  
+  function initSlideInteraction(captchaId) {
+    const slider = document.getElementById(`slide-slider-${captchaId}`);
+    const track = document.getElementById(`slide-track-${captchaId}`);
+    const progress = document.getElementById(`slide-progress-${captchaId}`);
+    
+    if (!slider || !track) return;
+    
+    let isDragging = false;
+    let startX = 0;
+    let startLeft = 0;
+    
+    slider.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', stopDrag);
+    
+    slider.addEventListener('touchstart', startDrag, { passive: false });
+    document.addEventListener('touchmove', drag, { passive: false });
+    document.addEventListener('touchend', stopDrag);
+    
+    function startDrag(e) {
+      e.preventDefault();
+      isDragging = true;
+      startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+      startLeft = parseInt(getComputedStyle(slider).left) || 0;
+      slider.classList.add('dragging');
+    }
+    
+    function drag(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      
+      const currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+      const deltaX = currentX - startX;
+      
+      const maxLeft = track.offsetWidth - slider.offsetWidth;
+      let newLeft = Math.max(0, Math.min(maxLeft, startLeft + deltaX));
+      
+      slider.style.left = newLeft + 'px';
+      progress.style.width = newLeft + 'px';
+      
+      // 实时更新输入框的值
+      const solutionInput = document.getElementById('captcha-solution');
+      if (solutionInput) {
+        const percentage = (newLeft / maxLeft) * 100;
+        solutionInput.value = Math.round(percentage);
+      }
+    }
+    
+    function stopDrag() {
+      if (isDragging) {
+        isDragging = false;
+        slider.classList.remove('dragging');
+        
+        // 检查是否完成验证
+        const sliderPos = parseInt(getComputedStyle(slider).left);
+        const trackWidth = track.offsetWidth - slider.offsetWidth;
+        
+        if (sliderPos >= trackWidth * 0.8) { // 80%以上认为完成
+          showNotification('✅ 滑动验证完成，请提交', 'success');
+        }
+      }
+    }
+  }
+  
+  function initFullImageSlide(captchaId) {
+    const overlay = document.getElementById(`slide-overlay-${captchaId}`);
+    const handle = document.getElementById(`slide-handle-${captchaId}`);
+    
+    if (!overlay || !handle) return;
+    
+    let isDragging = false;
+    let startX = 0;
+    let startLeft = 0;
+    
+    handle.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', stopDrag);
+    
+    function startDrag(e) {
+      e.preventDefault();
+      isDragging = true;
+      startX = e.clientX;
+      startLeft = parseInt(getComputedStyle(handle).left) || 0;
+      handle.classList.add('dragging');
+    }
+    
+    function drag(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      
+      const deltaX = e.clientX - startX;
+      const maxLeft = overlay.offsetWidth - handle.offsetWidth;
+      let newLeft = Math.max(0, Math.min(maxLeft, startLeft + deltaX));
+      
+      handle.style.left = newLeft + 'px';
+      
+      // 更新输入框值
+      const solutionInput = document.getElementById('captcha-solution');
+      if (solutionInput) {
+        const percentage = (newLeft / maxLeft) * 100;
+        solutionInput.value = Math.round(percentage);
+      }
+    }
+    
+    function stopDrag() {
+      if (isDragging) {
+        isDragging = false;
+        handle.classList.remove('dragging');
+      }
+    }
+  }
+  
+  function showNotification(message, type = 'info') {
+    // 简单的通知显示
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      z-index: 1001;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      ${type === 'success' ? 'background: #10b981;' : ''}
+      ${type === 'error' ? 'background: #ef4444;' : ''}
+      ${type === 'info' ? 'background: #3b82f6;' : ''}
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 3秒后自动消失
+    setTimeout(function() {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 3000);
   }
 
   // 页面加载完成后初始化通知关闭功能

@@ -32,3 +32,14 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs and temporary files
+*.log
+app.log
+cookies.txt
+
+# Test files
+tests/
+demos/
+*.test.py
+*.demo.py

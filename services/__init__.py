@@ -7,7 +7,9 @@ from .optimizer import AIOptimizer
 from .matcher import ResumeMatcher
 from .proxy_manager import proxy_manager, get_current_proxy, get_session_proxies
 from .browser_automation import browser_manager, get_browser_manager, get_page_with_browser
+from .captcha_handler import captcha_manager, get_captcha_manager
 
 __all__ = ['CareerSyncAI', 'JobCrawler', 'AIOptimizer', 'ResumeMatcher', 
            'proxy_manager', 'get_current_proxy', 'get_session_proxies',
-           'browser_manager', 'get_browser_manager', 'get_page_with_browser']
+           'browser_manager', 'get_browser_manager', 'get_page_with_browser',
+           'captcha_manager', 'get_captcha_manager']
